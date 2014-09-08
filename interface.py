@@ -4,6 +4,7 @@ import subprocess
 import json
 import os
 import cmd
+from pymongo import MongoClient
 
 
 class Shell(cmd.Cmd):
@@ -12,6 +13,7 @@ class Shell(cmd.Cmd):
     def __init__(self, configure, upstream):
         super().__init__()
         self.current_profile = None
+        self.responsibility = configure['responsibility']
         self.indent = configure.get('indent', 4)
         self.editor = configure.get('editor', 'vim')
         self.md5 = configure.get('md5', 'md5sum')
@@ -19,6 +21,8 @@ class Shell(cmd.Cmd):
         self.logger = logging.getLogger('Interaction')
         self.upstream = upstream
         self.current_uid = 0
+        self.mirror = MongoClient().sssta.fresh
+        self.current_committed = False
 
     def file_md5(self, path: str):
         if os.path.exists(path):
@@ -52,7 +56,7 @@ class Shell(cmd.Cmd):
         else:
             print("文件已修改, 请注意提交")
 
-    def do_fetch(self, arg):
+    def do_pull(self, arg):
         self.current_profile = self.upstream.fetch(self.current_uid)
 
     def do_view(self, arg):
@@ -61,10 +65,26 @@ class Shell(cmd.Cmd):
     def do_checkout(self, uid):
         self.do_co(uid)
 
+    def do_score(self, score):
+        score = int(score)
+        self.current_profile['status'][
+            'score-{}'.format(self.responsibility)] = score
+
     def do_co(self, uid=None):
         if uid == '':
             self.current_uid += 1
         else:
             self.current_uid = int(uid)
+        if not self.current_committed:
+            print("当前修改未提交")
         print("\t当前工作于 UID:", self.current_uid)
         self.prompt = "{:3d}>".format(self.current_uid)
+
+    def do_pwd(self, arg):
+        print("\t当前工作于 UID:", self.current_uid)
+
+    def do_commit(self, args):
+        self.mirror.insert(self.current_profile)
+
+    def do_push(self, arg):
+        pass
