@@ -1,0 +1,8 @@
+{
+    "interviewer": "yourname",
+    "responsibility": 0,
+    "upstream": "origin",
+    "localmirror": "mongo",
+    "editot": "vim",
+    "indent": 4
+}
