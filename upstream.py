@@ -15,7 +15,7 @@ APPEND = BASE + "set?er={er}&id={id}&append={append}"
 
 class Upstream(object):
     def __init__(self, configure):
-        upstream = configure.get('upstream', None)
+        upstream = configure.get('upstream', 'origin')
         self.interviewer = configure['interviewer']
         self.logger = logging.getLogger("Upstream")
         self.profiles = {}
@@ -39,9 +39,15 @@ class Upstream(object):
             doc = PyQuery(url=self.baseurl.format(id=uid))
             content = doc('.col-xs-12').children().children()
             _texts = content('p')
-            uid, name, sex = content('.lead').text().split(maxsplit=2)
-            tel, email, _, qq = content('.col-sm-9')('div')[2] \
+            _base_info = content('.lead').text().split(maxsplit=2)
+            if len(_base_info) != 3:
+                _base_info += [''] * (3 - len(_base_info))
+            uid, name, sex = _base_info
+            _contact = content('.col-sm-9')('div')[2] \
                 .text_content().split(maxsplit=3)
+            if len(_contact) != 4:
+                _contact += [''] * (4 - len(_contact))
+            tel, email, _, qq = _contact
             img = content('img')[0].get('src')
             describe = _texts[0].text
             dept = content('span')[4].text.strip()
@@ -52,18 +58,18 @@ class Upstream(object):
             js = doc('script')[2].text.split()
             c2, c3, c4 = js[7][1:-2], js[11][1:-2], js[27][1:-2]
             specials = [s.text for s in status('.list-group-item')[5:]]
-        except:
-            self.logger.error("信息自动获取失败")
+        except Exception as e:
+            self.logger.error("信息自动获取失败:{}".format(e))
             return None
         # 整合
         profile = {
             "profile": {
-                "name": name,
+                "name": name.strip(),
                 "id": uid,
                 "sex": sex,
-                "tel": tel,
-                "email": email,
-                "qq": qq,
+                "tel": tel.strip(),
+                "email": email.strip(),
+                "qq": qq.strip(),
                 "img": img,
                 "describe": describe,
             },
