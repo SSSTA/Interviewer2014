@@ -6,7 +6,7 @@ from interface import Shell
 from upstream import Upstream
 
 
-def config():
+def config_shell():
     logging.basicConfig(filename="interviewer.log", level='NOTSET')
     logger = logging.getLogger('Configurator')
     try:
@@ -14,8 +14,7 @@ def config():
         fp = open('config.json')
         configure = json.load(fp)
         fp.close()
-        logger.info("配置本地缓存")
-        logger.info("配置上游")
+        logger.info("正在配置Shell")
         upstream = Upstream(configure)
         shell = Shell(configure, upstream)
         return shell
@@ -25,8 +24,14 @@ def config():
 
 
 def main():
-    shell = config()
-    shell.cmdloop()
+    logger = logging.getLogger("main")
+    shell = config_shell()
+    try:
+        shell.cmdloop()
+    except KeyboardInterrupt:
+        logger.info("用户键盘中断, 正在退出")
+    finally:
+        shell.shutdown()
 
 
 if __name__ == '__main__':
