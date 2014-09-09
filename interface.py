@@ -21,8 +21,10 @@ class Shell(cmd.Cmd):
         self.logger = logging.getLogger('Interaction')
         self.upstream = upstream
         self.current_uid = 0
-        self.mirror = MongoClient().sssta.fresh
-        self.current_committed = False
+        self.connect = MongoClient()
+        self.mirror = self.connect.sssta.fresh
+        # 初始状态为无更改已提交
+        self.current_committed = True
 
     def file_md5(self, path: str):
         if os.path.exists(path):
@@ -54,37 +56,82 @@ class Shell(cmd.Cmd):
         if new_md5 == raw_md5:
             print(self.editor + "已关闭, 文件未修改")
         else:
-            print("文件已修改, 请注意提交")
+            self.current_committed = False
+            print("文件已修改, 正在读回")
+            try:
+                fp = open(path)
+                new_profile = json.load(fp)
+                self.current_profile = new_profile
+            except:
+                self.logger.error("更改后文件读回失败")
+                print("读取失败: 修改已抛弃")
+            finally:
+                fp.close()
+
+    def shutdown(self):
+        self.connect.close()
+
 
     def do_pull(self, arg):
         self.current_profile = self.upstream.fetch(self.current_uid)
 
-    def do_view(self, arg):
+    def do_pl(self, arg):
+        self.do_pull(None)
+
+    def do_v(self, arg):
         self.handle(self.current_profile)
 
     def do_checkout(self, uid):
         self.do_co(uid)
 
-    def do_score(self, score):
-        score = int(score)
-        self.current_profile['status'][
-            'score-{}'.format(self.responsibility)] = score
-
     def do_co(self, uid=None):
+        if not self.current_committed:
+            print("当前修改未提交!")
+            return
+        old_uid = self.current_uid
         if uid == '':
             self.current_uid += 1
         else:
             self.current_uid = int(uid)
-        if not self.current_committed:
-            print("当前修改未提交")
-        print("\t当前工作于 UID:", self.current_uid)
-        self.prompt = "{:3d}>".format(self.current_uid)
+        print("正在抓取")
+        try:
+            self.do_pull(None)
+            print("\t当前工作于 UID:", self.current_uid)
+            self.prompt = "{:3d}>".format(self.current_uid)
+        except:
+            print("读取失败")
+            self.current_uid = old_uid
 
     def do_pwd(self, arg):
         print("\t当前工作于 UID:", self.current_uid)
 
     def do_commit(self, args):
-        self.mirror.insert(self.current_profile)
+        if not self.current_committed:
+            self.mirror.insert(self.current_profile)
+            print("UID:", self.current_uid, "已提交")
+            print("COUNT", self.mirror.count())
+            self.current_committed = True
+        else:
+            print("Nothing to commit")
+
+    def do_score(self, arg):
+        try:
+            score = int(arg)
+            if score < 0:
+                score = 0
+            if score > 5:
+                score = 5
+        except:
+            print("无法理解的数值")
+            return
+        self.current_profile['status']['score-%d' % self.responsibility] = score
+        self.current_committed = False
+
+    def do_append(self, arg):
+        self.current_profile['status']['specials'] += ('\n' + arg)
+        self.current_committed = False
 
     def do_push(self, arg):
-        pass
+        self.do_pwd(None)
+        self.upstream.commit(self.current_profile)
+        print("已推送")

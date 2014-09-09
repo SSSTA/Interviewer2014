@@ -66,7 +66,7 @@ class Upstream(object):
             status = doc('#sidebar')('.list-group')
             js = doc('script')[2].text.split()
             c2, c3, c4 = js[7][1:-2], js[11][1:-2], js[27][1:-2]
-            specials = [s.text for s in status('.list-group-item')[5:]]
+            specials = status('.list-group-item')[5].text
         except Exception as e:
             self.logger.error("信息自动获取失败:{}".format(e))
             return None
@@ -99,7 +99,7 @@ class Upstream(object):
         return profile
 
     def commit(self, profile):
-        uid = profile['profile']['uid']
+        uid = profile['profile']['id']
         new = profile['status']
         raw = self.profiles[uid]['status']
         hock = {
@@ -110,12 +110,12 @@ class Upstream(object):
         for key in raw:
             if new[key] != raw[key]:
                 if key in hock:
-                    PyQuery(url=COMMIT.format(er=self.interviewer,
-                                              id=uid,
-                                              level=hock[key],
-                                              score=new[key]))
+                    PyQuery(self.commiturl.format(
+                        id=uid,
+                        level=hock[key],
+                        score=new[key]))
                 else:
-                    PyQuery(url=APPEND.format(er=self.interviewer,
-                                              id=uid,
-                                              append=new[key]))
+                    PyQuery(url=self.appendurl.format(
+                        id=uid,
+                        append=new[key]))
 
