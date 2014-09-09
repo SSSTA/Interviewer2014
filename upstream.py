@@ -9,23 +9,32 @@ from pyquery import PyQuery
 
 BASE = "http://sssta.sinaapp.com/index.php/Home/Fresh/"
 URL = BASE + "interview?er={interviewer}&id={{id}}#"
-COMMIT = BASE + "set?er={er}&id={id}&level={level}&score={score}"
-APPEND = BASE + "set?er={er}&id={id}&append={append}"
+COMMIT = BASE + "set?er={interviewer}&id={{id}}&level={{level}}&score={{score}}"
+APPEND = BASE + "set?er={interviewer}&id={{id}}&append={{append}}"
 
 
 class Upstream(object):
     def __init__(self, configure):
-        upstream = configure.get('upstream', 'origin')
-        self.interviewer = configure['interviewer']
         self.logger = logging.getLogger("Upstream")
+        self.logger.info("正在配置上游")
+        upstream = configure.get('upstream', 'origin')
+        self.logger.info("上游 = %s", upstream)
+        self.interviewer = configure['interviewer']
+        self.logger.info("面试官 = %s", self.interviewer)
         self.profiles = {}
         if upstream == 'origin':
             try:
                 self.baseurl = URL.format(**configure)
+                self.appendurl = APPEND.format(**configure)
+                self.commiturl = COMMIT.format(**configure)
+                self.logger.info("fetch-URL: %s", self.baseurl)
+                self.logger.info("append-URL: %s", self.appendurl)
+                self.logger.info("commit-URL: %s", self.commiturl)
             # 如果配置文件出现了奇怪的问题
             # 以至于无法配置base url
-            except:
-                logging.error('Upstream无法解析的配置文件', **configure)
+            except Exception as e:
+                logging.error('Upstream无法解析的配置文件:\n%s\n当前配置:%s',
+                              str(e) + e.__traceback__, str(configure))
                 raise ValueError
 
     def fetch(self, uid):
