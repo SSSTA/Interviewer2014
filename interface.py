@@ -71,9 +71,11 @@ class Shell(cmd.Cmd):
     def shutdown(self):
         self.connect.close()
 
-
     def do_pull(self, arg):
         self.current_profile = self.upstream.fetch(self.current_uid)
+        if self.current_profile is None:
+            self.logger.error("FETCH FAILED")
+            print("抓取失败")
 
     def do_pl(self, arg):
         self.do_pull(None)
@@ -93,6 +95,18 @@ class Shell(cmd.Cmd):
             self.current_uid += 1
         else:
             self.current_uid = int(uid)
+        if self.current_profile:
+            print("正在备份")
+            try:
+                self.mirror.insert(self.current_profile)
+                self.logger.info("UID: %d | COMMIT", self.current_uid)
+            except Exception as e:
+                self.logger.error("UID: %d | COMMIT FAILED", self.current_uid)
+                print("UID:", old_uid, e, "提交失败")
+                print("COUNT", self.mirror.count())
+                return
+            print("UID:", old_uid, "已提交")
+            print("COUNT", self.mirror.count())
         print("正在抓取")
         try:
             self.do_pull(None)
@@ -107,9 +121,8 @@ class Shell(cmd.Cmd):
 
     def do_commit(self, args):
         if not self.current_committed:
-            self.mirror.insert(self.current_profile)
-            print("UID:", self.current_uid, "已提交")
-            print("COUNT", self.mirror.count())
+            self.do_push(self.current_profile)
+            self.logger.info("UID: %d | COMMITTED -> T")
             self.current_committed = True
         else:
             print("Nothing to commit")
@@ -124,14 +137,40 @@ class Shell(cmd.Cmd):
         except:
             print("无法理解的数值")
             return
-        self.current_profile['status']['score-%d' % self.responsibility] = score
+        self.logger.info("UID: %d | 级别: %d 打分: %s", self.current_uid,
+                         self.responsibility, arg)
+        try:
+            self.current_profile['status'][
+                'score-%d' % self.responsibility] = score
+            self.logger.info("UID: %d | 级别: %d 打分: %s SUCCESS",
+                             self.current_uid,
+                             self.responsibility, arg)
+        except:
+            self.logger.info("UID: %d | 级别: %d 打分: %s FAILTED",
+                             self.current_uid,
+                             self.responsibility, arg)
+        self.logger.info("UID: %d | COMMITTED -> F")
         self.current_committed = False
 
     def do_append(self, arg):
-        self.current_profile['status']['specials'] += ('\n' + arg)
-        self.current_committed = False
+        self.logger.info("UID: %d | 追加: %s", self.current_uid, arg)
+        try:
+            self.current_profile['status']['specials'] += ('\n' + arg)
+            self.logger.info("UID: %d | 追加成功", self.current_uid)
+            self.logger.info("UID: %d | COMMITTED -> F")
+            self.current_committed = False
+        except:
+            self.logger.error("UID: %d | 追加失败", self.current_uid)
+            print("添加失败")
 
     def do_push(self, arg):
-        self.do_pwd(None)
-        self.upstream.commit(self.current_profile)
-        print("已推送")
+        print("正在推送至上游")
+        self.logger.info("UID: %d | PUSH", self.current_uid)
+        try:
+            self.upstream.commit(self.current_profile)
+            self.logger.info("UID: %d | PUSH SUCCESS", self.current_uid)
+        except Exception as e:
+            self.logger.error("UID: %d | PUSH FAILED", self.current_uid)
+            print("推送失败", e, self.current_profile, sep='\n')
+        else:
+            print("已推送")
